@@ -2,7 +2,6 @@ package loadbalance
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -14,6 +13,8 @@ import (
 const Scheme = "etcd"
 
 // var cli *clientv3.Client
+
+var _ resolver.Resolver = (*etcdResolver)(nil)
 
 type etcdResolver struct {
 	etcdAddr   string
@@ -31,7 +32,7 @@ func NewResolver(etcdAddr string) (resolver.Builder, error) {
 			DialTimeout: 15 * time.Second,
 		})
 		if err != nil {
-			fmt.Printf("connect to etcd err: %s\n", err)
+			log.Printf("connect to etcd err: %s\n", err)
 			return nil, err
 		}
 	}
@@ -51,12 +52,8 @@ func (r *etcdResolver) Close() {
 }
 
 func (r *etcdResolver) Build(target resolver.Target, clientConn resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
-
 	r.clientConn = clientConn
-
-	// go r.watch("/" + target.URL.Scheme + "/" + target.Endpoint() + "/")
 	go r.watch("/" + target.Scheme + "/" + target.Endpoint + "/")
-
 	return r, nil
 }
 
@@ -65,7 +62,7 @@ func (r *etcdResolver) watch(keyPrefix string) {
 
 	resp, err := r.cli.Get(context.Background(), keyPrefix, clientv3.WithPrefix())
 	if err != nil {
-		fmt.Printf("get services addr lists err: %s\n", err)
+		log.Printf("get services addr lists err: %s\n", err)
 	} else {
 		for i := range resp.Kvs {
 			addrList = append(addrList, resolver.Address{Addr: strings.TrimPrefix(string(resp.Kvs[i].Key), keyPrefix)})
